@@ -20,11 +20,14 @@ This repository is essentially a wrapper for the Yahoo API to pull data like lea
 
 ### Notes / Disclaimers
 1. This continues to be a work-in-process.  A lot of my time has been spent figuring out the API and refactoring my code.  I still have a long way to go.  Please keep that in mind.
-2. My goal is to extend this to all plug-in-play to
-3. There are still a lot of issues with the data, some that might be hard to get over or that require less than ideal solutions. Here are some of the issues:
-    * Team Names - Users have one team_key each year for each league.  Early years lack a linkage from league to league or year to year.  There is now a GUID field, but it is still unreliable.  I wam working on finding a solution to this matter.
-    * New Fields - In recent years, Yahoo has been adding data (e.g., projected points in 200X, matchup recaps in 20XX, etc.).  This makes data inconsistent and missing for some years.  It also makes the munging job more difficult!
-    * Multiple Owners for a Single Team - This is not handled well right now.  Simply capturing the first team owner.
+2. My goal is to extend this to all plug-in-play to some sort of visualization (maybe Tableau).
+3. There are still a lot of issues with the data, some that might be hard to get over or that require less than ideal solutions. See the next section.
+
+### Known Issues
+* Team Names - Users have one team_key each year for each league.  Early years lack a linkage from league to league or year to year.  There is now a GUID field, but it is still unreliable.  I wam working on finding a solution to this matter.
+* New Fields - In recent years, Yahoo has been adding data (e.g., projected points in 200X, matchup recaps in 20XX, etc.).  This makes data inconsistent and missing for some years.  It also makes the munging job more difficult!
+* Multiple Owners for a Single Team - This is not handled well right now.  Simply capturing the first team owner.
+* Naming conventions - Still working on harmonizing the field names and optimizing the database.
 
 ### Thanks
 1. Thanks to [Andrew Martin](https://github.com/almartin82/yahoo_roster_extract) who got me started with even making this possible.  His original implementation, while very script-focused, got me where I am today. I spent lots of time reviewing how he authenticated and parsed the data.  Wouldn't be here without him!
