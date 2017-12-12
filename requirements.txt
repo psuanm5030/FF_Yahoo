@@ -1,0 +1,16 @@
+certifi==2017.11.5
+chardet==3.0.4
+idna==2.6
+numpy==1.13.3
+objectpath==0.5
+pandas==0.21.0
+psycopg2==2.7.3.2
+python-dateutil==2.6.1
+pytz==2017.3
+PyYAML==3.12
+requests==2.18.4
+sanction==0.4.1
+six==1.11.0
+SQLAlchemy==1.1.15
+urllib3==1.22
+xmltodict==0.11.0
