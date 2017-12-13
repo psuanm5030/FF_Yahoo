@@ -14,12 +14,26 @@ Base = declarative_base()
 class db_Storage(object):
 
     # todo Primary keys.  Need to have legit primary keys for every row to make updating better without having to do it all
+    """
+    PRIMARY KEYS
+    league_details - LEAGUE_KEY
+    league_all_stat_values - ID
+    league_only_stat_values - LEAGUE_KEY + ' - ' + STAT_KEY
+    draft_with_players - LEAGUE_KEY + ' - ' + PICK
+    team_details - TEAM_KEY
+    scoreboard_one - MATCHUP_ID + LEAGUE_KEY
+    scoreboard_two - ??????
+    league_transactions - LEAGUE_KEY + ' - ' + TRANS_ID + ' - ' + TRANSACTION_DATA_TYPE
+    player_weekly_stats - LEAGUE_KEY + ' - ' + PLAYER_KEY / PLAYER_ID
+    league_standings - LEAGUE_KEY + ' - ' + TEAM_ID
+    season_stats_all_players - LEAGUE_KEY + ' - ' + PLAYER_KEY / PLAYER_ID
+    """
 
     def __init__(self, which):
         self.db_creds = self.get_creds(which)
         self.engine = self.db_open()
         self.table_check = {
-            'test': test,
+            # 'test': test,
             'league_details':league_details,
             'league_all_stat_values':league_all_stat_values,
             'league_only_stat_values':league_only_stat_values,
@@ -94,10 +108,6 @@ class db_Storage(object):
         # meta = MetaData(self.engine, reflect=True)
         # t = meta.tables[self.table]
         # self.engine.execute(t.delete().where(t.c.Primary_Key != ''))
-
-    def test(self):
-
-        print 'Successfully Connected to DB.'
 
 # DB Models
 class test(Base):
@@ -641,6 +651,7 @@ class season_stats_all_players(Base):
     IMAGE_URL = Column(String)
     INJURY_NOTE = Column(String)
     INTERCEPTIONS = Column(Float)
+    INTERCEPTION = Column(Float)
     IS_UNDROPPABLE = Column(String)
     LEAGUE_KEY = Column(String)
     NAME_ASCII_FIRST = Column(String)

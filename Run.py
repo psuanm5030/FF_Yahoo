@@ -27,8 +27,8 @@ if __name__ == '__main__':
     # Setup DB Connection
     d = db.db_Storage('aws_master')
     # d.delete_all_tables()
-    d.delete_table('scoreboard_one')
-    d.delete_table('scoreboard_two')
+    d.delete_table('team_details')
+    # d.delete_table('scoreboard_two')
 
     # DB: Store League / Stat Details
     d.delete_table('league_details')
@@ -49,14 +49,14 @@ if __name__ == '__main__':
         # d.create_table(api.db_league_standings, table_name='league_standings')
 
         # DB: Store Team Details
-        # api.get_teams_detail(lg)
-        # d.create_table(api.db_team_details, table_name='team_details')
+        api.get_teams_detail(lg)
+        d.create_table(api.db_team_details, table_name='team_details')
         # todo guid missing for many
 
         # SCOREBOARD
-        api.get_scoreboard(lg)
-        d.create_table(api.db_scoreboard_one, table_name='scoreboard_one')
-        d.create_table(api.db_scoreboard_two, table_name='scoreboard_two')
+        # api.get_scoreboard(lg)
+        # d.create_table(api.db_scoreboard_one, table_name='scoreboard_one')
+        # d.create_table(api.db_scoreboard_two, table_name='scoreboard_two')
 
         # DB: League Transactions
         # api.get_league_transactions(lg)

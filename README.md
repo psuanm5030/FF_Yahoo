@@ -35,7 +35,7 @@ This repository is essentially a wrapper for the Yahoo API to pull data like lea
 4. This can generate a lot of calls.  They allow 20K per hour.  **Working on setting up limits
 
 ### Known Issues
-* Team Names - Users have one team_key each year for each league.  Early years lack a linkage from league to league or year to year.  There is now a GUID field, but it is still unreliable.  I wam working on finding a solution to this matter.
+* Team Names - Users have one team_key each year for each league.  Early years lack a linkage from league to league or year to year.  There is now a GUID field, but it is still unreliable.  I wam working on finding a solution to this matter.  Note: GUIDs (unique identifiers for owners) came around in 2009 but it wasnt until 2012 when they were implemented no matter a users choice to hide their personal details.
 * New Fields - In recent years, Yahoo has been adding data (e.g., projected points in 200X, matchup recaps in 20XX, etc.).  This makes data inconsistent and missing for some years.  It also makes the munging job more difficult!
 * Multiple Owners for a Single Team - This is not handled well right now.  Simply capturing the first team owner.
 * Naming conventions - Still working on harmonizing the field names and optimizing the database.

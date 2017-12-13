@@ -67,38 +67,33 @@ class Yahoo_API(object):
     ## Helper Methods
     def send_query(self,url):
         """
-        Makes request to API.
-        :param url: e.g., 'https://fantasysports.yahooapis.com/fantasy/v2/league/359.l.67045'
-        :return: dataframe
+        Makes request to API and parse the response.
+        :param url: full-formed request URL to send with the request.
+        :return: dictionary
         """
         headers = {"Authorization": "bearer " + self.token,
                    "format":"json"}
-        # url = 'https://fantasysports.yahooapis.com/fantasy/v2/league/359.l.67045'
+
         r = requests.get(url, headers=headers)
         details = xmltodict.parse(r.content) # in dictionary formats
+
+        # Remove the ordered dict and return a python dictionary
         d1 = json.dumps(details)
         d2 = json.loads(d1) # in json format - to be used with object path
         return d2
 
-    ## Helper Methods
-    def format_league_details(self):
-        new_data = []
-        for lg in self.league_raw:
-            new_data.append(self.clean_dict_keys({
-                'league_key':lg['league_key'],
-                'season':lg['season'],
-                'name':lg['name'],
-                'num_teams':lg['num_teams']}))
-        return new_data
-
-    def dict_for_db(self, data, **kwargs):
+    @staticmethod
+    def _dict_for_db(data, **kwargs):
         """
-        Takes dict and creates list of dicts with key inlcuded
+        Returns listing of dict.  Optionally will flatten the top-level key into the dict.
+        :param data: Dict
+        :param kwargs: key_name
         :return: list of dicts
         """
         key_name = kwargs.get('key_name', None)
 
-        if key_name: # Return a listing of dicts with added keys with key name (per argument
+        # Adds in top-level key into dict and returns listing of dict
+        if key_name:
             new_data = []
             for k,v in data.iteritems():
                 v.update({key_name: k})
@@ -110,9 +105,10 @@ class Yahoo_API(object):
                 new_data.append(v)
             return new_data
 
-    def dict_type_conversion(self,l,to_int=[],to_string=[],to_float=[]):
+    @staticmethod
+    def _dict_type_conversion(l, to_int=[], to_string=[], to_float=[]):
         """
-        Takes a listing of dicts and performs conversions as requested.
+        Takes a listing of dicts and convert types for items passed in parameters.
         :param d: listing of dicts
         :param to_int: fields to convert to integer
         :param to_string: fields to convert to string
@@ -130,15 +126,16 @@ class Yahoo_API(object):
             n1.append(line)
         return n1
 
-    def clean_dict_keys(self, d):
+    @staticmethod
+    def _clean_dict_keys(d):
         """
-        Clean up the keys and prepare for DB.
+        Clean KEYS and prepare for DB.
             - Upper
             - Remove special chars
             - Unicode to string
+            - Harmonize certain keys
+        :param d: dict
         :return: dict
-        :param d: Expects a dictionary
-        :return:
         """
         new_d = {}
         for k,v in d.iteritems():
@@ -154,16 +151,16 @@ class Yahoo_API(object):
             new_d.update({k2: v})
         return new_d
 
-    def clean_dict_values(self, d):
+    @staticmethod
+    def _clean_dict_values(d):
         """
-        Clean up the keys and prepare for DB.
+        Clean VALUES and prepare for DB.
             - Upper
             - Remove special chars
             - Unicode to string
-            - Special instances with stat key names
+            - Harmonize certain values
+        :param d: dict
         :return: dict
-        :param d: Expects a dictionary
-        :return:
         """
         new_d = {}
         for k,v in d.iteritems():
@@ -178,16 +175,17 @@ class Yahoo_API(object):
             new_d.update({k: v2})
         return new_d
 
-    def clean_specific_key_values(self, d, key):
+    @staticmethod
+    def _clean_specific_key_values(d, key):
         """
-        Clean up the values for a SPECIFIC KEY.
+        Clean VALUES for a SPECIFIC KEY (parameter).
             - Upper
             - Remove special chars
             - Unicode to string
-            - Special instances with stat key names
+            - Harmonize certain keys
+        :param d: dict
+        :param key: string - key that should be modified
         :return: dict
-        :param d: Expects a dictionary
-        :return:
         """
         new_d = {}
         for k,v in d.iteritems():
@@ -205,12 +203,13 @@ class Yahoo_API(object):
                 new_d.update({k: v})
         return new_d
 
-    def _make_stat_attrs_map(self, stat_dict):
+    @staticmethod
+    def _make_stat_attrs_map(stat_dict):
         """
-
-        :param stat_dict: Dictionary at this location:
+        Take a dict of stats and munge / cleanse into dict with statID as key with attributes as values.
+        :param stat_dict: dict of stat values - typically located here:
             [u'fantasy_content'][u'league'][u'settings'][u'stat_categories'][u'stats'][u'stat']
-        :return:
+        :return: dict
         """
         # Modifiers typically has less - if there is a state but no points are associated
         stat_dict_categories = stat_dict[u'stat_categories'][u'stats'][u'stat']
@@ -230,29 +229,42 @@ class Yahoo_API(object):
 
         return stat_attrs_map
 
-    def admin_drop_suffixed_columns(self,df):
-        keep_cols = [c for c in df.columns if '_del' not in c]
-        df = df[keep_cols]
-        return df
+    def _format_league_details(self):
+        """
+        Form a listing of dicts - each item is a dict of league of attributes.
+        :return: list of dicts
+        """
+        new_data = []
+        for lg in self.league_raw:
+            new_data.append(self._clean_dict_keys({
+                'league_key':lg['league_key'],
+                'season':lg['season'],
+                'name':lg['name'],
+                'num_teams':lg['num_teams']}))
+        return new_data
 
-    def admin_rename_fields(self, df, rename_dict):
-        df.rename(columns=rename_dict, inplace=True)  # Change column names
-
-    def flatten(self, d, parent_key='', sep='_'):
+    def _flatten(self, d, parent_key='', sep='_'):
+        """
+        Recursively flatten out a dict.  Optionionally set a parent_key and sepaerator to add when combining key names.
+        :param d: dictionary
+        :param parent_key: optional key to append to all new keys
+        :param sep: string character to place between keys upon concatenation
+        :return: dict
+        """
         items = []
         for k, v in d.items():
             new_key = parent_key + sep + k if parent_key else k
             if isinstance(v, collections.MutableMapping):
-                items.extend(self.flatten(v, new_key, sep=sep).items())
+                items.extend(self._flatten(v, new_key, sep=sep).items())
             else:
                 items.append((new_key, v))
         return dict(items)
 
     def _parse_player_transaction(self ,d):
         """
-        Parse the details for a player from transactions.
-        :param d: dictionary of detail
-        :return: flat dictionary
+        Parse the details for a player from transactions and flatten.
+        :param d: dict
+        :return: dict
         """
         """
         {u'display_position': u'RB',
@@ -271,14 +283,14 @@ class Yahoo_API(object):
                                     u'source_type': u'freeagents',
                                     u'type': u'add'}}
         """
-        return self.flatten(d)
+        return self._flatten(d)
 
     def _retrieve_player_details(self, player_key, league_key):
         """
-        Returns player information.
-        :param player_key: e.g., '359.p.24171' # 2016 Antonio Brown
-        **TYPE Status: ADDRESSED
-        :return: dictionary with player_key as ID and value map
+        Returns season data for player in cleansed dict - high level key is player_key.
+        :param league_key: league_key
+        :param player_key: player_key for api call (e.g., '359.p.24171' # 2016 Antonio Brown)
+        :return: dict (player_key is primary key)
         """
 
         url = self.base_url + "league/{0}/players;player_keys={1}/stats".format(league_key, player_key)
@@ -290,7 +302,7 @@ class Yahoo_API(object):
         except:
             pts = 0.0
         player_details = {dets['player_key']:
-            self.clean_dict_keys({
+            self._clean_dict_keys({
                 'bye_week': dets['bye_weeks']['week'],
                 'name': dets['name']['full'],
                 'fname': dets['name']['first'],
@@ -333,7 +345,7 @@ class Yahoo_API(object):
         test = [stats_dict.update({self.league_stat_map[x['stat_id']]['name']: float(x['value'])}) for x in stats]
 
         # Update Player dict with the stats functions
-        player_details[dets['player_key']].update(self.clean_dict_keys(stats_dict))
+        player_details[dets['player_key']].update(self._clean_dict_keys(stats_dict))
 
         print 'Retrieved {0} from {1}.'.format(player_details[player_key]['NAME']
                                                , player_details[player_key]['SEASON'])
@@ -376,14 +388,12 @@ class Yahoo_API(object):
         """
         This maps the stat_key to the actual name of the stat.  '50' becomes 'RECEIPTIONS' for example.
         :param frames: Takes in listing of dicts with stat values
-        :return: listing of dicts
+        :return: list of dicts
         """
-        # Map Stat Keys / IDs to formal names
-
         # Get the mapping
         mapping = {}
         for x in self.db_league_only_stats:
-            mapping.update(self.clean_dict_values(self.clean_dict_keys({x['STAT_KEY']: x['NAME']})))
+            mapping.update(self._clean_dict_values(self._clean_dict_keys({x['STAT_KEY']: x['NAME']})))
 
         # Run through the listing of dicts and replace each
         frames_new = []
@@ -397,7 +407,7 @@ class Yahoo_API(object):
             frames_new.append(new_d)
         return frames_new
 
-    # BUILD Items
+    # Primary Methods
     def get_league_details(self):
         """
         Get all the leagues for the user.
@@ -416,10 +426,10 @@ class Yahoo_API(object):
                 new_games.append(g)
 
         # DB Fmt
-        n1 = self.dict_type_conversion(new_games,to_int=['num_teams'])
+        n1 = self._dict_type_conversion(new_games, to_int=['num_teams'])
         n2 = []
         for d in n1:
-            n2.append(self.clean_dict_keys(d))
+            n2.append(self._clean_dict_keys(d))
         self.db_league_details = n2
 
         # Returnable - Dict with keys
@@ -591,18 +601,18 @@ class Yahoo_API(object):
                    'name':k,
                    'value':v
                    }
-            base_stats_fmt.append(self.clean_dict_keys(det))
+            base_stats_fmt.append(self._clean_dict_keys(det))
 
         # PREPARE Listing of dicts for DB
-        det_stats_fmt = self.dict_for_db(self.league_stat_map,key_name='stat_key')
+        det_stats_fmt = self._dict_for_db(self.league_stat_map, key_name='stat_key')
         det_stats_fmt_ = []
         for item in det_stats_fmt:
             item.update({'league_key':league_key})
-            det_stats_fmt_.append(self.clean_specific_key_values(self.clean_dict_keys(item),'NAME'))
+            det_stats_fmt_.append(self._clean_specific_key_values(self._clean_dict_keys(item), 'NAME'))
         all_stats_w_league = det_stats_fmt_ + base_stats_fmt
         self.db_league_all_stats = all_stats_w_league
         self.db_league_base_stats = base_stats_fmt
-        self.db_league_only_stats = self.dict_type_conversion(det_stats_fmt_ ,to_float=['VALUE'])
+        self.db_league_only_stats = self._dict_type_conversion(det_stats_fmt_, to_float=['VALUE'])
 
         # Setup some variables used later
         current_league = self.league_raw[league_key]
@@ -633,7 +643,7 @@ class Yahoo_API(object):
             for d in picks:
                 new_v = {}
                 new_v.update({'league_key':league_key})
-                new_ = self.clean_dict_keys(new_v)
+                new_ = self._clean_dict_keys(new_v)
                 db_fmt.append(new_)
             self.db_draft_with_players = db_fmt
             return db_fmt
@@ -654,11 +664,11 @@ class Yahoo_API(object):
             new_v = {}
             for k2,v2 in v.iteritems():
                 new_v.update({k2.upper():v2})
-            new_ = self.clean_dict_keys(new_v)
+            new_ = self._clean_dict_keys(new_v)
             db_fmt.append(new_)
-        db_fmt = self.dict_type_conversion(db_fmt,
-                                           to_int=[],
-                                           to_float=[])
+        db_fmt = self._dict_type_conversion(db_fmt,
+                                            to_int=[],
+                                            to_float=[])
         self.db_draft_with_players = db_fmt
         return picks_d
 
@@ -717,15 +727,15 @@ class Yahoo_API(object):
             team_details.update(keep)
 
         # PREPARE Listing of dicts for DB
-        t = self.dict_for_db(team_details,key_name='team_id')
+        t = self._dict_for_db(team_details, key_name='team_id')
         t_ = []
         for item in t:
             item.update({'league_key':league_key})
             item.pop('waiver_priority') # remove as its problematic
-            t_.append(self.clean_dict_keys(item))
-        n1 = self.dict_type_conversion(t_,
-                                       to_int=['NUMBER_OF_MOVES','NUMBER_OF_TRADES','WAIVER_PRIORITY'],
-                                       to_string=['SEASON','WAIVER_PRIORITY'])
+            t_.append(self._clean_dict_keys(item))
+        n1 = self._dict_type_conversion(t_,
+                                        to_int=['NUMBER_OF_MOVES','NUMBER_OF_TRADES','WAIVER_PRIORITY'],
+                                        to_string=['SEASON','WAIVER_PRIORITY'])
         self.db_team_details = n1
 
         return team_details
@@ -773,8 +783,8 @@ class Yahoo_API(object):
                     t1_type = 'T2'
                     t2_type = 'T1'
                     winner_team_key = match['winner_team_key']
-                team_1 = self.flatten(teams[0] ,t1_type)
-                team_2 = self.flatten(teams[1] ,t2_type)
+                team_1 = self._flatten(teams[0], t1_type)
+                team_2 = self._flatten(teams[1], t2_type)
                 team_1.update(team_2)
                 # organize the High-Level Matchup detail
                 match_details = {
@@ -821,32 +831,30 @@ class Yahoo_API(object):
         # PREPARE Listing of dicts for DB
         # One_Liner
         t1_ = []
-        new_one = self.dict_for_db(new_one,key_name='matchup_key')
+        new_one = self._dict_for_db(new_one, key_name='matchup_key')
         for item in new_one:
             item.update({'league_key':league_key})
-            t1_.append(self.clean_dict_keys(item))
-        t1_1 = self.dict_type_conversion(t1_,
-                                         to_int=['T2_NUMBER_OF_MOVES','T2_NUMBER_OF_TRADES','T1_NUMBER_OF_MOVES','T1_NUMBER_OF_TRADES'],
-                                         to_float=['T2_TEAM_PROJECTED_POINTS_TOTAL','T2_TEAM_POINTS_TOTAL','T1_TEAM_POINTS_TOTAL','T1_TEAM_PROJECTED_POINTS_TOTAL','T2_WIN_PROBABILITY','T1_WIN_PROBABILITY'])
+            t1_.append(self._clean_dict_keys(item))
+        t1_1 = self._dict_type_conversion(t1_,
+                                          to_int=['T2_NUMBER_OF_MOVES','T2_NUMBER_OF_TRADES','T1_NUMBER_OF_MOVES','T1_NUMBER_OF_TRADES'],
+                                          to_float=['T2_TEAM_PROJECTED_POINTS_TOTAL','T2_TEAM_POINTS_TOTAL','T1_TEAM_POINTS_TOTAL','T1_TEAM_PROJECTED_POINTS_TOTAL','T2_WIN_PROBABILITY','T1_WIN_PROBABILITY'])
         self.db_scoreboard_one = t1_1
 
-        # Two_Liner
+        # Two_Liner - clean keys, add league and convert types
         t2_ = []
-        new_two = self.dict_for_db(new_two, key_name='matchup_key')
+        new_two = self._dict_for_db(new_two, key_name='matchup_key')
         for item in new_two:
             item.update({'league_key':league_key})
-            t2_.append(self.clean_dict_keys(item))
-        t2_1 = self.dict_type_conversion(t2_,
-                                         to_int=['NUMBER_OF_MOVES','NUMBER_OF_TRADES','NUMBER_OF_MOVES','NUMBER_OF_TRADES'],
-                                         to_float=['TEAM_PROJECTED_POINTS_TOTAL','TEAM_POINTS_TOTAL','TEAM_POINTS_TOTAL','TEAM_PROJECTED_POINTS_TOTAL','WIN_PROBABILITY','WIN_PROBABILITY'])
+            t2_.append(self._clean_dict_keys(item))
+        t2_1 = self._dict_type_conversion(t2_,
+                                          to_int=['NUMBER_OF_MOVES','NUMBER_OF_TRADES','NUMBER_OF_MOVES','NUMBER_OF_TRADES'],
+                                          to_float=['TEAM_PROJECTED_POINTS_TOTAL','TEAM_POINTS_TOTAL','TEAM_POINTS_TOTAL','TEAM_PROJECTED_POINTS_TOTAL','WIN_PROBABILITY','WIN_PROBABILITY'])
         self.db_scoreboard_two = t2_1
 
         # Return data based upon choice
         if str.upper(return_type )=='TWO':
-            print 'Completed Scoreboard - returning TWO-line matchup dict.'
             return t2_1
         else:
-            print 'Completed Scoreboard - returning ONE-line matchup dict.'
             return t1_1
 
     def get_league_standings(self, league_key):
@@ -871,8 +879,8 @@ class Yahoo_API(object):
             if isinstance(d['managers']['manager'],list):
                 d['managers']['manager'] = d['managers']['manager'][0] # take first manager only
             d.update({'LEAGUE_KEY':league_key})
-            dets2.append(self.clean_dict_keys(self.flatten(d)))
-        dets2 = self.dict_type_conversion(dets2,to_int=['TEAM_STANDINGS_RANK','TEAM_STANDINGS_PLAYOFF_SEED','NUMBER_OF_MOVES','NUMBER_OF_TRADES','TEAM_STANDINGS_OUTCOME_TOTALS_WINS','TEAM_STANDINGS_OUTCOME_TOTALS_LOSSES','TEAM_STANDINGS_OUTCOME_TOTALS_TIES'], to_float=['TEAM_POINTS_TOTAL','TEAM_STANDINGS_OUTCOME_TOTALS_PERCENTAGE','TEAM_STANDINGS_POINTS_AGAINST','TEAM_STANDINGS_POINTS_FOR','TEAM_STANDINGS_STREAK_VALUE'])
+            dets2.append(self._clean_dict_keys(self._flatten(d)))
+        dets2 = self._dict_type_conversion(dets2, to_int=['TEAM_STANDINGS_RANK', 'TEAM_STANDINGS_PLAYOFF_SEED', 'NUMBER_OF_MOVES', 'NUMBER_OF_TRADES', 'TEAM_STANDINGS_OUTCOME_TOTALS_WINS', 'TEAM_STANDINGS_OUTCOME_TOTALS_LOSSES', 'TEAM_STANDINGS_OUTCOME_TOTALS_TIES'], to_float=['TEAM_POINTS_TOTAL', 'TEAM_STANDINGS_OUTCOME_TOTALS_PERCENTAGE', 'TEAM_STANDINGS_POINTS_AGAINST', 'TEAM_STANDINGS_POINTS_FOR', 'TEAM_STANDINGS_STREAK_VALUE'])
         self.db_league_standings = dets2
         dets_w_keys = {x.pop('TEAM_KEY'):x for x in dets2}
         return dets_w_keys
@@ -930,11 +938,11 @@ class Yahoo_API(object):
             pass
 
         # PREPARE Listing of dicts for DB
-        t1 = self.dict_for_db(df.T.to_dict())
+        t1 = self._dict_for_db(df.T.to_dict())
         t2 = []
         for item in t1:
             item.update({'league_key':league_key})
-            t2.append(self.clean_dict_keys(item))
+            t2.append(self._clean_dict_keys(item))
         self.db_league_transactions = t2
 
         # todo address types.
@@ -967,7 +975,7 @@ class Yahoo_API(object):
                 teams_det.update({'week':week})
 
                 for player in roster: # Players
-                    player_det = self.flatten(player)
+                    player_det = self._flatten(player)
                     stats = player_det.pop('player_stats_stats_stat')
                     # Abstract the Stats
                     stats_det = {}
@@ -985,11 +993,11 @@ class Yahoo_API(object):
         # PREPARE Listing of dicts for DB
         t = []
         for item in frames_new:
-            t.append(self.clean_dict_keys(item))
-        self.dict_type_conversion(t,
-                                  to_int=['NUMBER_OF_MOVES','NUMBER_OF_TRADES'],
-                                  to_float=['PLAYER_POINTS_TOTAL'],
-                                  to_string=['WEEK'])
+            t.append(self._clean_dict_keys(item))
+        self._dict_type_conversion(t,
+                                   to_int=['NUMBER_OF_MOVES','NUMBER_OF_TRADES'],
+                                   to_float=['PLAYER_POINTS_TOTAL'],
+                                   to_string=['WEEK'])
         self.db_player_weekly_stats = t
 
         return
@@ -1039,7 +1047,7 @@ class Yahoo_API(object):
             tree = op.Tree(r)
             roster = [x for x in tree.execute('$..player')]
             for ply in roster:
-                ply_new = self.flatten(ply)
+                ply_new = self._flatten(ply)
                 # Take out the stats to flatten
                 stats = ply_new.pop('player_stats_stats_stat')
                 stats_det = {}
@@ -1055,15 +1063,15 @@ class Yahoo_API(object):
 
         # Map the stats
         roster_clean = self._map_stat(roster_flat)
-        roster_clean = [self.clean_dict_keys(x) for x in roster_clean]
-        roster_clean = self.dict_type_conversion(roster_clean,
-                                                 to_int=['PERCENT_OWNED_DELTA','PERCENT_OWNED_VALUE','PERCENT_OWNED_WEEK','OWNERSHIP_TEAMS_TEAM_NUMBER_OF_MOVES','OWNERSHIP_TEAMS_TEAM_NUMBER_OF_TRADES'],
-                                                 to_float=['PLAYER_POINTS_TOTAL','DRAFT_ANALYSIS_AVERAGE_COST','DRAFT_ANALYSIS_AVERAGE_PICK','DRAFT_ANALYSIS_AVERAGE_ROUND','DRAFT_ANALYSIS_PERCENT_DRAFTED'])
+        roster_clean = [self._clean_dict_keys(x) for x in roster_clean]
+        roster_clean = self._dict_type_conversion(roster_clean,
+                                                  to_int=['PERCENT_OWNED_DELTA','PERCENT_OWNED_VALUE','PERCENT_OWNED_WEEK','OWNERSHIP_TEAMS_TEAM_NUMBER_OF_MOVES','OWNERSHIP_TEAMS_TEAM_NUMBER_OF_TRADES'],
+                                                  to_float=['PLAYER_POINTS_TOTAL','DRAFT_ANALYSIS_AVERAGE_COST','DRAFT_ANALYSIS_AVERAGE_PICK','DRAFT_ANALYSIS_AVERAGE_ROUND','DRAFT_ANALYSIS_PERCENT_DRAFTED'])
         self.db_season_stats_all_players = roster_clean
         return roster_clean
 
 
-    # API Methods - Not Completed
+    # Not Completed
     def get_roster_today(self, league_key):
         """
         Gets the roster of players for each fantasy team.
@@ -1089,7 +1097,7 @@ class Yahoo_API(object):
             meta_frame = pd.DataFrame.from_dict(teams[team], orient='index').T
 
             for player in roster:
-                player_flat = self.flatten(player)
+                player_flat = self._flatten(player)
                 player_frame = pd.DataFrame.from_dict(player_flat, orient='index').T
                 both_frames = pd.concat([meta_frame, player_frame], axis=1).set_index(['team_key'])
                 frames.append(both_frames)
@@ -1157,7 +1165,7 @@ class Yahoo_API(object):
         # Parse the results
         frames = []
         for p in master_players:
-            player_flat = self.flatten(p)
+            player_flat = self._flatten(p)
             player_frame = pd.DataFrame.from_dict(player_flat, orient='index').T
             frames.append(player_frame)
             print 'ds'
@@ -1242,12 +1250,3 @@ if __name__ == '__main__':
 
 
     print 'done'
-
-
-"""
-Tables to Create: 
-- League Details: Shows all league keys and associated information
-- League Stats: Shows all the league stat keys
-- Draft with Player Stats: Shows the draft and the player stasts
-    - ** Will need to think about how to update this in season.
-"""
