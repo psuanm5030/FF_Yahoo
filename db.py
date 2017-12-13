@@ -727,6 +727,7 @@ class season_stats_all_players(Base):
     STATUS = Column(String)
     SACK = Column(Float)
     TARGETS = Column(Float)
+    TOUCHDOWN = Column(Float)
     TWO_POINT_CONVERSIONS = Column(Float)
     UNIFORM_NUMBER = Column(String)
 
