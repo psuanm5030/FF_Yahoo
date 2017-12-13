@@ -706,6 +706,7 @@ class season_stats_all_players(Base):
     RUSHING_TOUCHDOWNS = Column(Float)
     RUSHING_YARDS = Column(Float)
     STATUS = Column(String)
+    SACK = Column(Float)
     TARGETS = Column(Float)
     TWO_POINT_CONVERSIONS = Column(Float)
     UNIFORM_NUMBER = Column(String)

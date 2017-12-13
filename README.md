@@ -19,7 +19,7 @@ This repository is essentially a wrapper for the Yahoo API to pull data like lea
 1. To Be Completed - Not Ready for Primetime!
 
 ## Tables
-* 'league_details' - TBC
+* 'league_details' - Each row is a league
 * 'league_all_stat_values' - TBC
 * 'league_only_stat_values' - TBC
 * 'league_standings' - TBC
