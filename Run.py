@@ -27,13 +27,13 @@ if __name__ == '__main__':
     # Setup DB Connection
     d = db.db_Storage('aws_master')
     # d.delete_all_tables()
-    d.delete_table('team_details')
-    # d.delete_table('scoreboard_two')
+    #d.delete_table('team_details')
+    d.delete_table('season_stats_all_players')
 
     # DB: Store League / Stat Details
-    d.delete_table('league_details')
-    api.get_league_details()
-    d.create_table(api.db_league_details, table_name='league_details')
+    #d.delete_table('league_details')
+    #api.get_league_details()
+    #d.create_table(api.db_league_details, table_name='league_details')
 
 
     for lg in api.league_keys_list:
@@ -76,5 +76,5 @@ if __name__ == '__main__':
         # d.create_table(api.db_player_weekly_stats, table_name='player_weekly_stats')
 
         # DB: All Players - Season Stats
-        # api.get_players_all(lg)
-        # d.create_table(api.db_season_stats_all_players, table_name='season_stats_all_players')
+        api.get_players_all(lg)
+        d.create_table(api.db_season_stats_all_players, table_name='season_stats_all_players')
