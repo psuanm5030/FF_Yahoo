@@ -1,13 +1,20 @@
+"""
+Purpose: Primary run script that will cycle through all leagues (with 'game_code' == 'nfl) and store the data into the db.
+Notes: This script retrieves data, parses / flattens it, and cleans it.  Most methods can be called independently with a league key.  League keys can be retrieved by calling the method 'get_leagues'.
+"""
+
 import Auth_Handler
 from API_Data import Yahoo_API
+import db
 import timeit
 
 if __name__ == '__main__':
-    # Setup
+    # Setup Yahoo Connection
     h = Auth_Handler.Auth()
     api = Yahoo_API(h)
-    d = Auth_Handler.db_Storage(h, 'aws_master')
-    d.delete_all_tables()
+    # Setup DB Connection
+    d = db.db_Storage('aws_master')
+    # d.delete_all_tables()
 
     """
     Problems: 
@@ -50,9 +57,17 @@ if __name__ == '__main__':
 
         # **************** UNTESTED ****************
         # DB: Draft with Player Stats
-        api.get_draft_by_leaguekey(lg)
-        d.create_table(api.db_draft_with_players, table_name='draft_with_players')
+        # api.get_draft_by_leaguekey(lg)
+        # d.create_table(api.db_draft_with_players, table_name='draft_with_players')
+
+        # DB: Season Stats - All Players
+        # api.get_draft_by_leaguekey(lg)
+        # d.create_table(api.db_season_stats_all_players, table_name='season_stats_all_players')
 
         # DB: Weekly Player Stats
         # api.get_roster_stats_week(lg)
         # d.create_table(api.db_player_weekly_stats, table_name='player_weekly_stats')
+
+        # DB: All Players - Season Stats
+        api.get_players_all(lg)
+        d.create_table(api.db_season_stats_all_players, table_name='season_stats_all_players')

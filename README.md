@@ -18,10 +18,20 @@ This repository is essentially a wrapper for the Yahoo API to pull data like lea
 ## Usage
 1. To Be Completed - Not Ready for Primetime!
 
+## Tables
+* 'league_details' - TBC
+* 'league_all_stat_values' - TBC
+* 'league_only_stat_values' - TBC
+* 'league_standings' - TBC
+* 'team_details' - TBC
+* 'draft_with_players' - TBC
+* 'player_weekly_stats' - TBC
+
 ### Notes / Disclaimers
 1. This continues to be a work-in-process.  A lot of my time has been spent figuring out the API and refactoring my code.  I still have a long way to go.  Please keep that in mind.
 2. My goal is to extend this to all plug-in-play to some sort of visualization (maybe Tableau).
 3. There are still a lot of issues with the data, some that might be hard to get over or that require less than ideal solutions. See the next section.
+4. This can generate a lot of calls.  They allow 20K per hour.  **Working on setting up limits
 
 ### Known Issues
 * Team Names - Users have one team_key each year for each league.  Early years lack a linkage from league to league or year to year.  There is now a GUID field, but it is still unreliable.  I wam working on finding a solution to this matter.
@@ -30,7 +40,7 @@ This repository is essentially a wrapper for the Yahoo API to pull data like lea
 * Naming conventions - Still working on harmonizing the field names and optimizing the database.
 
 ### Thanks
-1. Thanks to [Andrew Martin](https://github.com/almartin82/yahoo_roster_extract) who got me started with even making this possible.  His original implementation, while very script-focused, got me where I am today. I spent lots of time reviewing how he authenticated and parsed the data.  Wouldn't be here without him!
-2. Thanks to stack overflow for all the learning!
+1. Thanks to [Andrew Martin's Repository](https://github.com/almartin82/yahoo_roster_extract) which got me started with even making this possible.  His original implementation, while very script-focused, got me where I am today. I spent lots of time reviewing how he authenticated and parsed the data.  Wouldn't be here without him!
+2. Thanks to SO for all the learning!
 3. Thanks to [PyCharm](https://www.jetbrains.com/pycharm/) for being an awesome tool and making this easier to do!
 3. Thanks to [Yahoo! Fantasy API Node Module](http://yfantasysandbox.herokuapp.com/) for putting together something that I admire.  I didn't use this enough, but its a great resource.  If you are looking to extend this, take a look!

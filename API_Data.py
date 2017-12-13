@@ -1,3 +1,8 @@
+"""
+Purpose: Wrapper for Yahoo API.
+Notes: This script retrieves data, parses / flattens it, and cleans it.  Most methods can be called independently with a league key.  League keys can be retrieved by calling the method 'get_leagues'.
+"""
+
 import Auth_Handler
 import requests
 import json
@@ -7,12 +12,14 @@ import pandas as pd
 import pprint as pp
 from datetime import datetime
 import collections
+import db
 
 # Overall
 # todo Need to send the right types for fields
 # todo remove Pandas
 # todo limit refreshes
 # todo could make calls more efficient - able to call more than one league at once.
+# todo should i be using u'http://fantasysports.yahooapis.com/fantasy/v2/base.rng' xmlns
 # Scoreboard
 # todo need to clean up NaN and nan here / everywhere
 # Managers
@@ -46,7 +53,6 @@ class Yahoo_API(object):
         self.db_league_all_stats = None # 'value' are strings
         self.db_league_base_stats = None # 'value' are strings
         self.db_league_only_stats = None # 'value' are floats
-        # todo check if this only_stats is COMPLETE??
         self.db_draft_with_players = None
         self.db_team_details = None
         self.db_scoreboard_one = None
@@ -54,6 +60,7 @@ class Yahoo_API(object):
         self.db_league_transactions = None
         self.db_player_weekly_stats = None
         self.db_league_standings = None
+        self.db_season_stats_all_players = None
 
     ## Helper Methods
     def send_query(self,url):
@@ -72,19 +79,6 @@ class Yahoo_API(object):
         return d2
 
     ## Helper Methods
-    def send_query_TEST(self,url):
-        """
-        Makes request to API.
-        :param url: e.g., 'https://fantasysports.yahooapis.com/fantasy/v2/league/359.l.67045'
-        :return: dataframe
-        """
-        headers = {"Authorization": "bearer " + self.token,
-                   "format":"json"}
-        # url = 'https://fantasysports.yahooapis.com/fantasy/v2/league/359.l.67045'
-        r = requests.get(url, headers=headers)
-        details = xmltodict.parse(r.content, dict_constructor=lambda *args, **kwargs: collections.defaultdict(collections.defaultdict, *args, **kwargs)) # in dictionary formats
-        return details
-
     def format_league_details(self):
         new_data = []
         for lg in self.league_raw:
@@ -149,6 +143,7 @@ class Yahoo_API(object):
             k2 = k.upper()
             k2 = k2.replace("-", "_")
             k2 = k2.replace(" ", "_")
+            k2 = k2.replace("@", "_")
             k2 = k2.replace("+", "")
             k2 = k2.encode("utf-8") # remove unicode reprsentations
             if k2.startswith('2_'):
@@ -275,6 +270,130 @@ class Yahoo_API(object):
                                     u'type': u'add'}}
         """
         return self.flatten(d)
+
+    def _retrieve_player_details(self, player_key, league_key):
+        """
+        Returns player information.
+        :param player_key: e.g., '359.p.24171' # 2016 Antonio Brown
+        **TYPE Status: ADDRESSED
+        :return: dictionary with player_key as ID and value map
+        """
+
+        url = self.base_url + "league/{0}/players;player_keys={1}/stats".format(league_key, player_key)
+        r = self.send_query(url)
+        tree = op.Tree(r)
+        dets = tree.execute('$..player[0]')
+        try:
+            pts = float(dets['player_points']['total'])
+        except:
+            pts = 0.0
+        player_details = {dets['player_key']:
+            self.clean_dict_keys({
+                'bye_week': dets['bye_weeks']['week'],
+                'name': dets['name']['full'],
+                'fname': dets['name']['first'],
+                'lname': dets['name']['last'],
+                'player_id': dets['player_id'],
+                'position_type': dets['position_type'],
+                'uniform_number': dets['uniform_number'],
+                'display_position': dets['display_position'],
+                'team_abbr': dets['editorial_team_abbr'],
+                'team': dets['editorial_team_full_name'],
+                'team_key': dets['editorial_team_key'],
+                'image_url': dets['image_url'],
+                'season': dets['player_points']['season'],
+                'player_points': pts,
+                'league_key': league_key
+            })
+        }
+
+        # Manage Stats Details
+        """
+        {u'2-Point_Conversions': 0.0,
+         u'Completions': 0.0,
+         u'Fumbles_Lost': 0.0,
+         u'Interceptions': 0.0,
+         u'Offensive_Fumble_Return_TD': 0.0,
+         u'Passing_Touchdowns': 0.0,
+         u'Passing_Yards': 0.0,
+         u'Receiving_Touchdowns': 12.0,
+         u'Receiving_Yards': 1284.0,
+         u'Receptions': 106.0,
+         u'Return_Touchdowns': 0.0,
+         u'Return_Yards': 163.0,
+         u'Rushing_Attempts': 3.0,
+         u'Rushing_Touchdowns': 0.0,
+         u'Rushing_Yards': 9.0,
+         u'Targets': 154.0}
+        """
+        stats_dict = {}
+        stats = tree.execute('$..player[0]..stat')
+        test = [stats_dict.update({self.league_stat_map[x['stat_id']]['name']: float(x['value'])}) for x in stats]
+
+        # Update Player dict with the stats functions
+        player_details[dets['player_key']].update(self.clean_dict_keys(stats_dict))
+
+        print 'Retrieved {0} from {1}.'.format(player_details[player_key]['NAME']
+                                               , player_details[player_key]['SEASON'])
+
+        """ Final looks like this: 
+        {u'273.p.7760': {'BYE_WEEK': u'7',
+                         'COMPLETIONS': 255.0,
+                         'DISPLAY_POSITION': u'QB',
+                         'FNAME': u'Jay',
+                         'FUMBLES_LOST': 4.0,
+                         'IMAGE_URL': u'https://s.yimg.com/iu/api/res/1.2/HOa2mZFG_jklfdGhkcJ.qA--~B/YXBwaWQ9c2hhcmVkO2NoPTIzMzY7Y3I9MTtjdz0xNzkwO2R4PTg1NztkeT0wO2ZpPXVsY3JvcDtoPTYwO3E9MTAwO3c9NDY-/https://s.yimg.com/xe/i/us/sp/v/nfl_cutout/players_l/20161007/7760.png',
+                         'INTERCEPTIONS': 14.0,
+                         'LEAGUE_KEY': u'273.l.314496',
+                         'LNAME': u'Cutler',
+                         'NAME': u'Jay Cutler',
+                         'OFFENSIVE_FUMBLE_RETURN_TD': 0.0,
+                         'PASSING_TOUCHDOWNS': 19.0,
+                         'PASSING_YARDS': 3033.0,
+                         'PLAYER_ID': u'7760',
+                         'PLAYER_POINTS': 235.62,
+                         'POSITION_TYPE': u'O',
+                         'RECEPTIONS': 0.0,
+                         'RECEPTION_TOUCHDOWNS': 0.0,
+                         'RECEPTION_YARDS': 0.0,
+                         'RETURN_TOUCHDOWNS': 0.0,
+                         'RETURN_YARDS': 0.0,
+                         'RUSHING_TOUCHDOWNS': 0.0,
+                         'RUSHING_YARDS': 233.0,
+                         'SEASON': u'2012',
+                         'TEAM': u'Miami Dolphins',
+                         'TEAM_ABBR': u'Mia',
+                         'TEAM_KEY': u'nfl.t.15',
+                         'TWO_POINT_CONVERSIONS': 0.0,
+                         'UNIFORM_NUMBER': u'6'}}
+        """
+
+        return player_details  # dict by player_id
+
+    def _map_stat(self, frames):
+        """
+        This maps the stat_key to the actual name of the stat.  '50' becomes 'RECEIPTIONS' for example.
+        :param frames: Takes in listing of dicts with stat values
+        :return: listing of dicts
+        """
+        # Map Stat Keys / IDs to formal names
+
+        # Get the mapping
+        mapping = {}
+        for x in self.db_league_only_stats:
+            mapping.update(self.clean_dict_values(self.clean_dict_keys({x['STAT_KEY']: x['NAME']})))
+
+        # Run through the listing of dicts and replace each
+        frames_new = []
+        for f in frames:
+            new_d = {}
+            for k, v in f.iteritems():
+                try:
+                    new_d.update({mapping[k]: v})
+                except:
+                    new_d.update({k: v})
+            frames_new.append(new_d)
+        return frames_new
 
     # BUILD Items
     def get_leagues(self):
@@ -490,112 +609,14 @@ class Yahoo_API(object):
 
         return all_stats_w_league
 
-    def _retrieve_player_details(self, player_key, league_key):
-        """
-        Returns player information.
-        :param player_key: e.g., '359.p.24171' # 2016 Antonio Brown
-        **TYPE Status: ADDRESSED
-        :return: dictionary with player_key as ID and value map
-        """
-
-        url = self.base_url + "league/{0}/players;player_keys={1}/stats".format(league_key ,player_key)
-        r = self.send_query(url)
-        tree = op.Tree(r)
-        dets = tree.execute('$..player[0]')
-        try:
-            pts = float(dets['player_points']['total'])
-        except:
-            pts = 0.0
-        player_details = {dets['player_key']:
-            self.clean_dict_keys({
-                'bye_week': dets['bye_weeks']['week'],
-                'name': dets['name']['full'],
-                'fname': dets['name']['first'],
-                'lname': dets['name']['last'],
-                'player_id': dets['player_id'],
-                'position_type': dets['position_type'],
-                'uniform_number': dets['uniform_number'],
-                'display_position': dets['display_position'],
-                'team_abbr': dets['editorial_team_abbr'],
-                'team': dets['editorial_team_full_name'],
-                'team_key': dets['editorial_team_key'],
-                'image_url': dets['image_url'],
-                'season': dets['player_points']['season'],
-                'player_points': pts,
-                'league_key' :league_key
-            })
-        }
-
-        # Manage Stats Details
-        """
-        {u'2-Point_Conversions': 0.0,
-         u'Completions': 0.0,
-         u'Fumbles_Lost': 0.0,
-         u'Interceptions': 0.0,
-         u'Offensive_Fumble_Return_TD': 0.0,
-         u'Passing_Touchdowns': 0.0,
-         u'Passing_Yards': 0.0,
-         u'Receiving_Touchdowns': 12.0,
-         u'Receiving_Yards': 1284.0,
-         u'Receptions': 106.0,
-         u'Return_Touchdowns': 0.0,
-         u'Return_Yards': 163.0,
-         u'Rushing_Attempts': 3.0,
-         u'Rushing_Touchdowns': 0.0,
-         u'Rushing_Yards': 9.0,
-         u'Targets': 154.0}
-        """
-        stats_dict = {}
-        stats = tree.execute('$..player[0]..stat')
-        test = [stats_dict.update({self.league_stat_map[x['stat_id']]['name'] :float(x['value'])}) for x in stats]
-
-        # Update Player dict with the stats functions
-        player_details[dets['player_key']].update(self.clean_dict_keys(stats_dict))
-
-        print 'Retrieved {0} from {1}.'.format(player_details[player_key]['NAME']
-                                               ,player_details[player_key]['SEASON'])
-
-        """ Final looks like this: 
-        {u'273.p.7760': {'BYE_WEEK': u'7',
-                         'COMPLETIONS': 255.0,
-                         'DISPLAY_POSITION': u'QB',
-                         'FNAME': u'Jay',
-                         'FUMBLES_LOST': 4.0,
-                         'IMAGE_URL': u'https://s.yimg.com/iu/api/res/1.2/HOa2mZFG_jklfdGhkcJ.qA--~B/YXBwaWQ9c2hhcmVkO2NoPTIzMzY7Y3I9MTtjdz0xNzkwO2R4PTg1NztkeT0wO2ZpPXVsY3JvcDtoPTYwO3E9MTAwO3c9NDY-/https://s.yimg.com/xe/i/us/sp/v/nfl_cutout/players_l/20161007/7760.png',
-                         'INTERCEPTIONS': 14.0,
-                         'LEAGUE_KEY': u'273.l.314496',
-                         'LNAME': u'Cutler',
-                         'NAME': u'Jay Cutler',
-                         'OFFENSIVE_FUMBLE_RETURN_TD': 0.0,
-                         'PASSING_TOUCHDOWNS': 19.0,
-                         'PASSING_YARDS': 3033.0,
-                         'PLAYER_ID': u'7760',
-                         'PLAYER_POINTS': 235.62,
-                         'POSITION_TYPE': u'O',
-                         'RECEPTIONS': 0.0,
-                         'RECEPTION_TOUCHDOWNS': 0.0,
-                         'RECEPTION_YARDS': 0.0,
-                         'RETURN_TOUCHDOWNS': 0.0,
-                         'RETURN_YARDS': 0.0,
-                         'RUSHING_TOUCHDOWNS': 0.0,
-                         'RUSHING_YARDS': 233.0,
-                         'SEASON': u'2012',
-                         'TEAM': u'Miami Dolphins',
-                         'TEAM_ABBR': u'Mia',
-                         'TEAM_KEY': u'nfl.t.15',
-                         'TWO_POINT_CONVERSIONS': 0.0,
-                         'UNIFORM_NUMBER': u'6'}}
-        """
-
-        return player_details # dict by player_id
-
     def get_draft_by_leaguekey(self, league_key):
         """
         Get listing of picks for the leagues draft that season.  Matchup with player stat totals in that year.
         **TYPE Status: Unaddressed
         :return: dataframe
         """
-        leagues = self.get_league_settings_stats(league_key)
+        # Ensure that the settings are prepared.
+        self.get_league_settings_stats(league_key)
 
         url = self.base_url + "league/{}/draftresults".format(league_key)
         r = self.send_query(url)
@@ -604,7 +625,7 @@ class Yahoo_API(object):
         try:
             picks_d = {p.pop('player_key'): p for p in picks}
         except:
-            # there is no player_key in 2013
+            # there is no player_key in 2003
             db_fmt = []
             for d in picks:
                 new_v = {}
@@ -632,6 +653,9 @@ class Yahoo_API(object):
                 new_v.update({k2.upper():v2})
             new_ = self.clean_dict_keys(new_v)
             db_fmt.append(new_)
+        db_fmt = self.dict_type_conversion(db_fmt,
+                                           to_int=[],
+                                           to_float=[])
         self.db_draft_with_players = db_fmt
         return picks_d
 
@@ -642,6 +666,7 @@ class Yahoo_API(object):
         :param league_key:
         :return: dict of details organized by team_key (e.g., 359.l.67045.t.6)
         """
+        # Ensure that the settings are prepared.
         self.get_league_settings_stats(league_key)
 
         # Cycle through to request detail in each team
@@ -695,7 +720,9 @@ class Yahoo_API(object):
             item.update({'league_key':league_key})
             item.pop('waiver_priority') # remove as its problematic
             t_.append(self.clean_dict_keys(item))
-        n1 = self.dict_type_conversion(t_,to_int=['NUMBER_OF_MOVES','NUMBER_OF_TRADES','WAIVER_PRIORITY'])
+        n1 = self.dict_type_conversion(t_,
+                                       to_int=['NUMBER_OF_MOVES','NUMBER_OF_TRADES','WAIVER_PRIORITY'],
+                                       to_string=['SEASON','WAIVER_PRIORITY'])
         self.db_team_details = n1
 
         return team_details
@@ -707,7 +734,8 @@ class Yahoo_API(object):
         :param league_key:
         :return: dict of matchups (matchup a
         """
-        leagues = self.get_league_settings_stats(league_key)
+        # Ensure that the settings are prepared.
+        self.get_league_settings_stats(league_key)
 
         # Cycle through to request detail in each team
         season_matchups = {}
@@ -794,7 +822,8 @@ class Yahoo_API(object):
         for item in new_one:
             item.update({'league_key':league_key})
             t1_.append(self.clean_dict_keys(item))
-        t1_1 = self.dict_type_conversion(t1_,to_int=['T2_NUMBER_OF_MOVES','T2_NUMBER_OF_TRADES','T1_NUMBER_OF_MOVES','T1_NUMBER_OF_TRADES'],
+        t1_1 = self.dict_type_conversion(t1_,
+                                         to_int=['T2_NUMBER_OF_MOVES','T2_NUMBER_OF_TRADES','T1_NUMBER_OF_MOVES','T1_NUMBER_OF_TRADES'],
                                          to_float=['T2_TEAM_PROJECTED_POINTS_TOTAL','T2_TEAM_POINTS_TOTAL','T1_TEAM_POINTS_TOTAL','T1_TEAM_PROJECTED_POINTS_TOTAL','T2_WIN_PROBABILITY','T1_WIN_PROBABILITY'])
         self.db_scoreboard_one = t1_1
 
@@ -804,7 +833,8 @@ class Yahoo_API(object):
         for item in new_two:
             item.update({'league_key':league_key})
             t2_.append(self.clean_dict_keys(item))
-        t2_1 = self.dict_type_conversion(t2_,to_int=['NUMBER_OF_MOVES','NUMBER_OF_TRADES','NUMBER_OF_MOVES','NUMBER_OF_TRADES'],
+        t2_1 = self.dict_type_conversion(t2_,
+                                         to_int=['NUMBER_OF_MOVES','NUMBER_OF_TRADES','NUMBER_OF_MOVES','NUMBER_OF_TRADES'],
                                          to_float=['TEAM_PROJECTED_POINTS_TOTAL','TEAM_POINTS_TOTAL','TEAM_POINTS_TOTAL','TEAM_PROJECTED_POINTS_TOTAL','WIN_PROBABILITY','WIN_PROBABILITY'])
         self.db_scoreboard_two = t2_1
 
@@ -918,19 +948,19 @@ class Yahoo_API(object):
         """
         # First fun Team_Details
         leagues = self.get_league_settings_stats(league_key)
-        teams = self.get_teams_detail(league_key)
+        teams1 = self.get_teams_detail(league_key)
         tdy = str(datetime.today())[:10]
 
         # Run through each team
         frames=[]
         for week in range(1,self.current_week+1): # Weeks
             print 'Retrieving week {} stats'.format(week)
-            for team in teams.keys(): # Teams
+            for team in teams1.keys(): # Teams
                 url_team_players = self.base_url + "teams;team_keys={}/roster;week={}/players/stats".format(team ,int(week))
                 r = self.send_query(url_team_players)
                 tree = op.Tree(r)
                 roster = [x for x in tree.execute('$..player')]
-                teams_det = teams[team]
+                teams_det = teams1[team]
                 teams_det.update({'week':week})
 
                 for player in roster: # Players
@@ -939,36 +969,98 @@ class Yahoo_API(object):
                     # Abstract the Stats
                     stats_det = {}
                     for stat in stats:
-                        stat2 = {stat[u'stat_id']:stat[u'value']}
+                        stat2 = {stat[u'stat_id']:float(stat[u'value'])}
                         stats_det.update(stat2)
                     player_det.update(stats_det)
-                    player_det.update(teams_det)
+                    # player_det.update(teams_det) # why is this here?
                     frames.append(player_det)
-            # break # Break after 1 week
+            break # Break after 1 week
 
         # Map Stat Keys / IDs to formal names
-        mapping = {}
-        for x in self.db_league_stats:
-            mapping.update(self.clean_dict_values(self.clean_dict_keys({x['STAT_KEY']:x['NAME']})))
-        frames_new = []
-        for f in frames:
-            new_d = {}
-            for k,v in f.iteritems():
-                try:
-                    new_d.update({mapping[k]: v})
-                except:
-                    new_d.update({k:v})
-            frames_new.append(new_d)
+        frames_new = self._map_stat(frames_new)
 
         # PREPARE Listing of dicts for DB
         t = []
         for item in frames_new:
             t.append(self.clean_dict_keys(item))
+        self.dict_type_conversion(t,
+                                  to_int=['NUMBER_OF_MOVES','NUMBER_OF_TRADES'],
+                                  to_float=['PLAYER_POINTS_TOTAL'],
+                                  to_string=['WEEK'])
         self.db_player_weekly_stats = t
 
         return
 
-    # API Methods - On manual pull
+    def get_players_all(self, league_key):
+        """
+        Get all players
+        :param league_key:
+        :return:
+        """
+        self.get_league_settings_stats(league_key)
+        request_times = 90 # this is roughly 2000 players (25 per call)
+        print 'Starting All Player Season Stats for {}'.format(league_key)
+
+        # Run
+        roster_flat = []
+        for i in range(0,request_times):
+            start = (i * 25) + 1
+            # stop = ((i+1)*25) + 1
+            count = 25
+
+            print 'Working through request {} of {}'.format(i,request_times)
+            url = self.base_url + "leagues;league_keys={}/players;out=stats,percent_owned,ownership,draft_analysis;start={};count={}".format(league_key,start,count)
+            r = self.send_query(url)
+            # Check for errors (found some issues where a "player was not found"
+            # This next loop runs until there is no error.
+            if 'error' in r:
+                print 'Error: {}. Incrementing by 1 now instead of 25.'
+                start += 1 # + 1 because last start didnt work
+                count -= 2
+                end = start + count
+                for ii in range(start,end):
+                    url = self.base_url + "leagues;league_keys={}/players;out=stats,percent_owned,ownership,draft_analysis;start={};count={}".format(
+                        league_key,ii,count)
+                    r = self.send_query(url)
+                    if 'error' in r:
+                        start += 1
+                        count -= 1
+                        continue
+                    else:
+                        print 'Error past at player: {}.'.format(str(ii))
+                        break
+            elif r['fantasy_content']['leagues']['league']['players'] == None:
+                print 'No more players being surfaced.  Breaking out of requests.  Sent {} requests.'.format(str(i))
+                break
+
+            tree = op.Tree(r)
+            roster = [x for x in tree.execute('$..player')]
+            for ply in roster:
+                ply_new = self.flatten(ply)
+                # Take out the stats to flatten
+                stats = ply_new.pop('player_stats_stats_stat')
+                stats_det = {}
+                for stat in stats:
+                    stat2 = {stat[u'stat_id']: float(stat[u'value'])}
+                    stats_det.update(stat2)
+                # Put the Stats back in
+                checks = ['draft_analysis_average_cost','draft_analysis_average_pick','draft_analysis_average_round','draft_analysis_percent_drafted']
+                ply_new = {k:(v.replace('-','0.0') if k in checks else v) for k,v in ply_new.items()}
+                ply_new.update(stats_det)
+                ply_new.update({'league_key': league_key}) # add League Key
+                roster_flat.append(ply_new)
+
+        # Map the stats
+        roster_clean = self._map_stat(roster_flat)
+        roster_clean = [self.clean_dict_keys(x) for x in roster_clean]
+        roster_clean = self.dict_type_conversion(roster_clean,
+                                                 to_int=['PERCENT_OWNED_DELTA','PERCENT_OWNED_VALUE','PERCENT_OWNED_WEEK','OWNERSHIP_TEAMS_TEAM_NUMBER_OF_MOVES','OWNERSHIP_TEAMS_TEAM_NUMBER_OF_TRADES'],
+                                                 to_float=['PLAYER_POINTS_TOTAL','DRAFT_ANALYSIS_AVERAGE_COST','DRAFT_ANALYSIS_AVERAGE_PICK','DRAFT_ANALYSIS_AVERAGE_ROUND','DRAFT_ANALYSIS_PERCENT_DRAFTED'])
+        self.db_season_stats_all_players = roster_clean
+        return roster_clean
+
+
+    # API Methods - Not Completed
     def get_roster_today(self, league_key):
         """
         Gets the roster of players for each fantasy team.
@@ -1100,15 +1192,18 @@ class Yahoo_API(object):
 if __name__ == '__main__':
     h = Auth_Handler.Auth()
     api = Yahoo_API(h)
-    d = Auth_Handler.db_Storage(h, 'aws_master')
+    # d = db.db_Storage('aws_master')
     # d.delete_all_tables()
 
     # Testing
-    # league_key = '348.l.294871'
+    league_key = '348.l.294871'
     # url = 'https://fantasysports.yahooapis.com/fantasy/v2/' + 'league/{}/standings'.format(league_key)
     # r_old = api.send_query(url)
     # r_new = api.send_query_TEST(url)
     # print 'd'
+    # Andy TEsitng
+    # api.get_roster_stats_week(league_key)
+    api.get_players_all(league_key)
 
     # DB: Store League / Stat Details
     # api.get_league_settings_stats(api.league_keys_list[27])
@@ -1125,9 +1220,9 @@ if __name__ == '__main__':
     # d.create_table(api.db_draft_with_players, table_name='draft_with_players')
 
     # SCOREBOARD
-    api.get_scoreboard('359.l.67045')
-    d.create_table(api.db_scoreboard_one, table_name='scoreboard_one')
-    d.create_table(api.db_scoreboard_two, table_name='scoreboard_two')
+    # api.get_scoreboard('359.l.67045')
+    # d.create_table(api.db_scoreboard_one, table_name='scoreboard_one')
+    # d.create_table(api.db_scoreboard_two, table_name='scoreboard_two')
 
     # DB: League Standings
     # api.get_league_standings('348.l.294871')
