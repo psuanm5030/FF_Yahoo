@@ -26,6 +26,7 @@ This repository is essentially a wrapper for the Yahoo API to pull data like lea
 * 'team_details' - TBC
 * 'draft_with_players' - TBC
 * 'player_weekly_stats' - TBC
+* 'season_stats_all_players' - TBC
 
 ### Notes / Disclaimers
 1. This continues to be a work-in-process.  A lot of my time has been spent figuring out the API and refactoring my code.  I still have a long way to go.  Please keep that in mind.
