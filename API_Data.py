@@ -13,6 +13,7 @@ import pprint as pp
 from datetime import datetime
 import collections
 import db
+import copy
 
 # Overall
 # todo Need to send the right types for fields
@@ -39,7 +40,7 @@ class Yahoo_API(object):
 
     def __init__(self,handler):
         self.token = handler.yahoo_auth.access_token
-        self.league_raw = self.get_leagues()
+        self.league_raw = self.get_league_details()
         self.league_keys_list = self.league_raw.keys()
 
         self.league_stat_map = {}
@@ -50,6 +51,7 @@ class Yahoo_API(object):
         self.league_stats_flattened = None
 
         # Database
+        self.db_league_details = None
         self.db_league_all_stats = None # 'value' are strings
         self.db_league_base_stats = None # 'value' are strings
         self.db_league_only_stats = None # 'value' are floats
@@ -396,7 +398,7 @@ class Yahoo_API(object):
         return frames_new
 
     # BUILD Items
-    def get_leagues(self):
+    def get_league_details(self):
         """
         Get all the leagues for the user.
         :returns: dict with keys of LEAGUE_KEY
@@ -418,10 +420,11 @@ class Yahoo_API(object):
         n2 = []
         for d in n1:
             n2.append(self.clean_dict_keys(d))
-        self.db_leagues = n2
+        self.db_league_details = n2
 
         # Returnable - Dict with keys
-        rtn = {x.pop('LEAGUE_KEY'):x for x in self.db_leagues}
+        n3 = copy.deepcopy(n2)
+        rtn = {x.pop('LEAGUE_KEY'):x for x in list(n3)}
         return rtn
 
     def get_league_settings_stats(self, league_key):
@@ -816,7 +819,7 @@ class Yahoo_API(object):
             new_two[k + ' - T1'] = new_w
 
         # PREPARE Listing of dicts for DB
-        # t1 = self.dict_for_db(df_one_liner.T.to_dict(),key_name='matchup_key')
+        # One_Liner
         t1_ = []
         new_one = self.dict_for_db(new_one,key_name='matchup_key')
         for item in new_one:
@@ -827,7 +830,7 @@ class Yahoo_API(object):
                                          to_float=['T2_TEAM_PROJECTED_POINTS_TOTAL','T2_TEAM_POINTS_TOTAL','T1_TEAM_POINTS_TOTAL','T1_TEAM_PROJECTED_POINTS_TOTAL','T2_WIN_PROBABILITY','T1_WIN_PROBABILITY'])
         self.db_scoreboard_one = t1_1
 
-        # t2 = self.dict_for_db(df_two_liner.T.to_dict(),key_name='matchup_key')
+        # Two_Liner
         t2_ = []
         new_two = self.dict_for_db(new_two, key_name='matchup_key')
         for item in new_two:
@@ -1203,6 +1206,7 @@ if __name__ == '__main__':
     # print 'd'
     # Andy TEsitng
     # api.get_roster_stats_week(league_key)
+    api.get_league_details(league_key)
     api.get_players_all(league_key)
 
     # DB: Store League / Stat Details

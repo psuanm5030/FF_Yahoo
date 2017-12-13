@@ -8,6 +8,18 @@ from API_Data import Yahoo_API
 import db
 import timeit
 
+"""
+Problems: 
+- When running through past years - there are issues with missing data.  MAYBE use a defaultdict?
+
+Validated for all years: 
+- 'league_details'
+- 'league_all_stat_values'
+- 'league_only_stat_values'
+- 'league_standings'
+- 'team_details'
+"""
+
 if __name__ == '__main__':
     # Setup Yahoo Connection
     h = Auth_Handler.Auth()
@@ -15,25 +27,20 @@ if __name__ == '__main__':
     # Setup DB Connection
     d = db.db_Storage('aws_master')
     # d.delete_all_tables()
+    d.delete_table('scoreboard_one')
+    d.delete_table('scoreboard_two')
 
-    """
-    Problems: 
-    - When running through past years - there are issues with missing data.  MAYBE use a defaultdict?
-    
-    Validated for all years: 
-    - 'league_details'
-    - 'league_all_stat_values'
-    - 'league_only_stat_values'
-    - 'league_standings'
-    - 'team_details'
-    """
+    # DB: Store League / Stat Details
+    d.delete_table('league_details')
+    api.get_league_details()
+    d.create_table(api.db_league_details, table_name='league_details')
+
 
     for lg in api.league_keys_list:
         print 'LEAGUE: {}'.format(lg)
 
-        # DB: Store League / Stat Details
+
         # api.get_league_settings_stats(lg)
-        # d.create_table(api.db_leagues, table_name='league_details')
         # d.create_table(api.db_league_all_stats, table_name='league_all_stat_values')
         # d.create_table(api.db_league_only_stats, table_name='league_only_stat_values')
 
@@ -47,9 +54,9 @@ if __name__ == '__main__':
         # todo guid missing for many
 
         # SCOREBOARD
-        # api.get_scoreboard(lg)
-        # d.create_table(api.db_scoreboard_one, table_name='scoreboard_one')
-        # d.create_table(api.db_scoreboard_two, table_name='scoreboard_two')
+        api.get_scoreboard(lg)
+        d.create_table(api.db_scoreboard_one, table_name='scoreboard_one')
+        d.create_table(api.db_scoreboard_two, table_name='scoreboard_two')
 
         # DB: League Transactions
         # api.get_league_transactions(lg)
@@ -69,5 +76,5 @@ if __name__ == '__main__':
         # d.create_table(api.db_player_weekly_stats, table_name='player_weekly_stats')
 
         # DB: All Players - Season Stats
-        api.get_players_all(lg)
-        d.create_table(api.db_season_stats_all_players, table_name='season_stats_all_players')
+        # api.get_players_all(lg)
+        # d.create_table(api.db_season_stats_all_players, table_name='season_stats_all_players')

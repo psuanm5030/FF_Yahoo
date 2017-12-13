@@ -146,7 +146,7 @@ class league_details(Base):
 
 
     def __repr__(self):
-        return "<Leagues(Season='%s', Name='%s', Teams='%s')>" % (self.season, self.name,self.num_teams)
+        return "<League Details (Season='%s', Name='%s', Teams='%s')>" % (self.season, self.name,self.num_teams)
 
 class league_all_stat_values(Base):
     __tablename__ = 'league_all_stat_values'
@@ -696,6 +696,14 @@ class season_stats_all_players(Base):
     PLAYER_STATS_COVERAGE_TYPE = Column(String)
     PLAYER_STATS_SEASON = Column(String)
     POINT_AFTER_ATTEMPT_MADE = Column(String)
+    POINTS_ALLOWED = Column(Float)
+    POINTS_ALLOWED_0_POINTS = Column(Float)
+    POINTS_ALLOWED_14_20_POINTS = Column(Float)
+    POINTS_ALLOWED_1_6_POINTS = Column(Float)
+    POINTS_ALLOWED_21_27_POINTS = Column(Float)
+    POINTS_ALLOWED_28_34_POINTS = Column(Float)
+    POINTS_ALLOWED_35_POINTS = Column(Float)
+    POINTS_ALLOWED_7_13_POINTS = Column(Float)
     POSITION_TYPE = Column(String)
     RECEIVING_TOUCHDOWNS = Column(Float)
     RECEIVING_YARDS = Column(Float)
